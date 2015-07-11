@@ -131,7 +131,8 @@ def print_kop_tek(best_words):
     return result
 
 def write_kop_tek(write_string, filename):
-    f = codecs.open('ihopenoonereadsthis', 'w', "utf-8")
+    f = codecs.open('ihopenoonereadsthis', 'w', "utf-8-sig")
+    #f.write(u'\uffef')
     f.write(write_string)
     f.flush()
     #please be atomic
