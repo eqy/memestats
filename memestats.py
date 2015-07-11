@@ -8,11 +8,18 @@ import codecs
 
 HOST_URL = 'a.4cdn.org'
 G_URL = '/g/catalog.json'
+
+def G_DESKTOP_FILTER(thread):
+    return 'desktop' in thread['com_lower'] and 'thread' in thread['com_lower']
+
+def G_BATTLESTATION_FILTER(thread):
+    return 'battlestation' in thread['com_lower'] and 'thread' in thread['com_lower']
+
 G_FILTERS = \
 [lambda thread: 
- not('battlestation' in thread['com_lower'] and 'thread' in thread['com_lower']),
+ not(G_BATTLESTATION_FILTER(thread)),
  lambda thread:
- not('desktop' in thread['com_lower'] and 'thread' in thread['com_lower']),
+ not(G_DESKTOP_FILTER(thread)),
  lambda thread:
  not('keyboard' in thread['com_lower'] and 'thread' in thread['com_lower']),
  lambda thread:
@@ -25,20 +32,27 @@ G_FILTERS = \
  not('headphone' in thread['com_lower'] and 'thread' in thread['com_lower'])
 ]
 
-ADDITIONAL_STOP_WORDS = {"like", "one", "/g/", "may", "-", "thread",
-"it's", "i've", "see", "get", "first", "new", "would", "&", "good", 
-"right", "way", "thoughts", "guys", "based", "maybe", "i'm",
-"ask", "related", "getting", "much", ">", "done", "got", "various"}
+
+ADDITIONAL_STOP_WORDS = {"like", "one", "/g/", "may", "-", "thread","someone",
+"it's", "i've", "see", "get", "first", "new", "would", "&", "good", "even",
+"right", "way", "thoughts", "guys", "based", "maybe", "i'm", "let's", "could",
+"ask", "related", "getting", "much", ">", "done", "got", "various", "looks",
+"back", "best", "user", "might", "link", "use", "threads", "you're"}
 
 K = 50
 MAX_BAR_LEN = 20
+MAX_IMAGES = 5
 
 def grab_and_parse(URL):
     m_http = http.client.HTTPConnection(HOST_URL) 
-    m_http.request('GET', G_URL)
+    m_http.request('GET', URL)
     m_response = m_http.getresponse() 
     m_raw_json = m_response.read()
     return json.loads(m_raw_json.decode())
+
+def grab_and_parse_thread(thread, board):
+    thread_url = "/{0}/thread/{1}.json".format(board, thread["no"])
+    return grab_and_parse(thread_url)
 
 def extract_threads(catalog_json):
     extracted_threads = []
@@ -49,21 +63,25 @@ def extract_threads(catalog_json):
 
 def try_get_com(thread):
     try:
-        return thread['com']
+        com = ""
+        sub = ""
+        com = thread['com']
+        sub = thread['sub']
+        return sub + " " + com
     except KeyError:
-        return ""
+        return sub + " " + com
 
 def add_lowered(thread):
     thread['com'] = try_get_com(thread)
     thread['com_lower'] = html.unescape(re.sub("<.*?>", "",\
     try_get_com(thread).lower()))
-    thread['com_lower'] = re.sub("[\.!?]", "", thread['com_lower'])
+    thread['com_lower'] = re.sub("[\.!?,:]", "", thread['com_lower'])
     return thread
 
 def remove_stops(thread):
     thread['no_stop'] = ' '.join([word for word in thread['com_lower'].split()\
     if word not in (stopwords.words('english')) and word not in\
-    ADDITIONAL_STOP_WORDS])
+    ADDITIONAL_STOP_WORDS and len(word) > 2])
     return thread
 
 def lowerify_threads(threads):
@@ -73,7 +91,7 @@ def lowerify_threads(threads):
 #assumes we have the lowercase comments
 def unstopify_threads(threads):
     unstopped_threads = map(lambda thread: remove_stops(thread), threads)
-    return unstopped_threads 
+    return list(unstopped_threads)
 
 def filter_threads(threads, filters):
     filtered_threads = filter(filters[0], threads)
@@ -112,27 +130,89 @@ def print_kop_tek(best_words):
             ' ({0:d})'.format(best_words[i][1])) + "\n"
     return result
 
-def write_kop_tek(graph_string):
+def write_kop_tek(write_string, filename):
     f = codecs.open('ihopenoonereadsthis', 'w', "utf-8")
-    f.write(graph_string)
+    f.write(write_string)
     f.flush()
     #please be atomic
-    os.rename('ihopenoonereadsthis', 'koptek.txt')
-
-#best code duplication
-def write_top_threads(link_string):
-    f = codecs.open('ihopenoonereadsthis2', 'w', "utf-8")
-    f.write(link_string)
-    f.flush()
-    #please be atomic
-    os.rename('ihopenoonereadsthis2', 'links')
-   
+    os.rename('ihopenoonereadsthis', filename)
 
 def gen_link(thread, board):
     return "<a href={0}>link</a> {1} <br \> <br \>".format(
         "http://boards.4chan.org/{0}/thread/{1}/".format(board, thread["no"]), 
         html.unescape(re.sub("<.*?>", "", thread['com'])))
-        
+
+def get_battlestation_thread(threads):
+    max_replies = 0
+    cur_thread = None
+    for thread in threads:
+        if G_BATTLESTATION_FILTER(thread):
+            if int(thread["replies"]) > max_replies:
+                cur_thread = thread
+    return cur_thread
+
+def get_desktop_thread(threads):
+    max_replies = 0
+    cur_thread = None
+    for thread in threads:
+        if G_DESKTOP_FILTER(thread):
+            if int(thread["replies"]) > max_replies:
+                cur_thread = thread
+    return cur_thread
+
+def get_posts_reply_counts(thread, board):
+    thread_posts = grab_and_parse_thread(thread, board)["posts"]
+    replies = {}
+    for post in thread_posts:
+        if "com" in post.keys():
+            beg = 0
+            while beg < len(post["com"]):
+                pos = post["com"].find('#p', beg)
+                if pos > 0: 
+                    #TODO: replace this constant later
+                    raw_reply_str = post["com"][pos+2:pos+25]
+                    reply_str = ""
+                    for c in raw_reply_str:
+                        if c.isdigit():
+                            reply_str = reply_str + c
+                        else:
+                            break
+                    if reply_str in replies:
+                        replies[int(reply_str)] = replies[reply_str] + 1
+                    else:
+                        replies[int(reply_str)] = 1
+                    beg = pos + 1
+                else:
+                    beg = len(post["com"])
+    for post in thread_posts:
+        if post["no"] in replies.keys():
+            post["replies"] = replies[post["no"]]
+        else:
+            post["replies"] = 0
+    return thread_posts
+
+
+def print_top_special_thread(thread_type, threads, board):
+    if thread_type == 'Battlestation': 
+        special_thread = get_battlestation_thread(threads)
+    else:
+        special_thread = get_desktop_thread(threads)
+    return_string = thread_type + " Thread Not Found"
+    if special_thread is None:
+        return return_string
+    posts = get_posts_reply_counts(special_thread, board)
+    return_string = gen_link(special_thread, board)
+    i = 0    
+    for post in sorted(posts, key=lambda post: post["replies"], reverse=True):
+        if "tim" in post:
+            return_string = return_string + '<a \
+href="http://i.4cdn.org/{0}/{1}{2}"><img src="http://i.4cdn.org/{0}/{1}s.jpg" \
+height="100"><br \><br \><br \>'.format(board,post["tim"],post["ext"])
+            i = i+1
+        if i >= MAX_IMAGES:
+            break
+    print(return_string)
+    return(return_string)
 
 def main():
     g_json = grab_and_parse(G_URL)
@@ -149,11 +229,14 @@ def main():
 
     top_words = most_frequent_words(filtered_threads)
 
-    write_top_threads(link_string)
-    write_kop_tek(print_kop_tek(top_words))
+    write_kop_tek(link_string, "links")
+    write_kop_tek(print_kop_tek(top_words), "koptek.txt")
 
-    
-    
+    battlestation_string = print_top_special_thread("Battlestation", unstopped_threads, 'g') 
+    desktop_string = print_top_special_thread("Desktop", unstopped_threads, 'g') 
+
+    write_kop_tek(battlestation_string, "battlestation")
+    write_kop_tek(desktop_string, "desktop")
 
 if __name__ == '__main__':
     main()
