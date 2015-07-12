@@ -14,7 +14,9 @@ def G_DESKTOP_FILTER(thread):
 and 'hackintosh' not in thread['com_lower']
 
 def G_BATTLESTATION_FILTER(thread):
-    return 'battlestation' in thread['com_lower'] and 'thread' in thread['com_lower']
+    return ('battlestation' in thread['com_lower'] and 'thread' in
+thread['com_lower']) or '/bst/' in thread['com_lower']
+    
 
 G_FILTERS = \
 [lambda thread: 
@@ -143,7 +145,7 @@ def write_kop_tek(write_string, filename, plain):
     os.rename('ihopenoonereadsthis', filename)
 
 def gen_link(thread, board):
-    return "<a href={0}>link</a> {1} <br \> <br \>".format(
+    return "<a href={0}>thread</a> {1} <br \> <br \>".format(
         "http://boards.4chan.org/{0}/thread/{1}/".format(board, thread["no"]), 
         html.unescape(re.sub("<.*?>", "", thread['com'])))
 
@@ -182,8 +184,8 @@ def get_posts_reply_counts(thread, board):
                             reply_str = reply_str + c
                         else:
                             break
-                    if reply_str in replies:
-                        replies[int(reply_str)] = replies[reply_str] + 1
+                    if int(reply_str) in replies:
+                        replies[int(reply_str)] = replies[int(reply_str)] + 1
                     else:
                         replies[int(reply_str)] = 1
                     beg = pos + 1
@@ -210,9 +212,12 @@ def print_top_special_thread(thread_type, threads, board):
     i = 0    
     for post in sorted(posts, key=lambda post: post["replies"], reverse=True):
         if "tim" in post:
+            print(post["replies"])
             return_string = return_string + '<a \
+href="http://boards.4chan.org/{0}/thread/{3}#p{4}">post</a><br \><a \
 href="http://i.4cdn.org/{0}/{1}{2}"><img src="http://i.4cdn.org/{0}/{1}s.jpg" \
-height="100"></a><br \><br \><br \>'.format(board,post["tim"],post["ext"])
+height="100"></a><br \><br \><br \
+\>'.format(board,post["tim"],post["ext"],special_thread["no"],post["no"])
             i = i+1
         if i >= MAX_IMAGES:
             break
