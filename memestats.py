@@ -10,7 +10,8 @@ HOST_URL = 'a.4cdn.org'
 G_URL = '/g/catalog.json'
 
 def G_DESKTOP_FILTER(thread):
-    return 'desktop' in thread['com_lower'] and 'thread' in thread['com_lower']
+    return 'desktop' in thread['com_lower'] and 'thread' in thread['com_lower']\
+and 'hackintosh' not in thread['com_lower']
 
 def G_BATTLESTATION_FILTER(thread):
     return 'battlestation' in thread['com_lower'] and 'thread' in thread['com_lower']
@@ -130,8 +131,11 @@ def print_kop_tek(best_words):
             ' ({0:d})'.format(best_words[i][1])) + "\n"
     return result
 
-def write_kop_tek(write_string, filename):
-    f = codecs.open('ihopenoonereadsthis', 'w', "utf-8-sig")
+def write_kop_tek(write_string, filename, plain):
+    if plain:
+        f = codecs.open('ihopenoonereadsthis', 'w', "utf-8-sig")
+    else:
+        f = open('ihopenoonereadsthis', 'w')
     #f.write(u'\uffef')
     f.write(write_string)
     f.flush()
@@ -208,7 +212,7 @@ def print_top_special_thread(thread_type, threads, board):
         if "tim" in post:
             return_string = return_string + '<a \
 href="http://i.4cdn.org/{0}/{1}{2}"><img src="http://i.4cdn.org/{0}/{1}s.jpg" \
-height="100"><br \><br \><br \>'.format(board,post["tim"],post["ext"])
+height="100"></a><br \><br \><br \>'.format(board,post["tim"],post["ext"])
             i = i+1
         if i >= MAX_IMAGES:
             break
@@ -230,14 +234,14 @@ def main():
 
     top_words = most_frequent_words(filtered_threads)
 
-    write_kop_tek(link_string, "links")
-    write_kop_tek(print_kop_tek(top_words), "koptek.txt")
+    write_kop_tek(link_string, "links", False)
+    write_kop_tek(print_kop_tek(top_words), "koptek.txt", True)
 
     battlestation_string = print_top_special_thread("Battlestation", unstopped_threads, 'g') 
     desktop_string = print_top_special_thread("Desktop", unstopped_threads, 'g') 
 
-    write_kop_tek(battlestation_string, "battlestation")
-    write_kop_tek(desktop_string, "desktop")
+    write_kop_tek(battlestation_string, "battlestation", False)
+    write_kop_tek(desktop_string, "desktop", False)
 
 if __name__ == '__main__':
     main()
