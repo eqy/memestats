@@ -203,6 +203,7 @@ def get_posts_reply_counts(thread, board):
     except ValueError:
         print("Failed to get reply counts for thread \
         {0:d}".format(thread["no"]))
+        return None
     for post in thread_posts:
         if post["no"] in replies.keys():
             post["replies"] = replies[post["no"]]
@@ -214,6 +215,8 @@ def rank_names(threads, board):
     names = {}
     for thread in threads:
         thread_posts = get_posts_reply_counts(thread, board)
+	if thread_posts is None:
+            continue
         #Limit rate of requests... this really slows us down though
         time.sleep(1.1)
         print("Ranking Names...Getting Thread " + str(thread["no"]))
