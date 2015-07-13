@@ -5,6 +5,7 @@ import re
 from nltk.corpus import stopwords
 import os
 import codecs
+import time
 
 HOST_URL = 'a.4cdn.org'
 G_URL = '/g/catalog.json'
@@ -45,6 +46,7 @@ ADDITIONAL_STOP_WORDS = {"like", "one", "/g/", "may", "-", "thread","someone",
 K = 50
 MAX_BAR_LEN = 20
 MAX_IMAGES = 5
+RANKS = 15
 
 def grab_and_parse(URL):
     m_http = http.client.HTTPConnection(HOST_URL) 
@@ -114,7 +116,7 @@ def most_frequent_words(threads):
             if word in word_counts:
                 word_counts[word] = word_counts[word] + int(thread['replies'])
             else:
-                word_counts[word] = 1
+                word_counts[word] = int(thread['replies'])
     return sorted(word_counts.items(), key=lambda item: item[1], reverse=True)
 
 def print_kop_tek(best_words):
@@ -155,6 +157,7 @@ def get_battlestation_thread(threads):
     for thread in threads:
         if G_BATTLESTATION_FILTER(thread):
             if int(thread["replies"]) > max_replies:
+                max_replies = int(thread["replies"])
                 cur_thread = thread
     return cur_thread
 
@@ -164,33 +167,42 @@ def get_desktop_thread(threads):
     for thread in threads:
         if G_DESKTOP_FILTER(thread):
             if int(thread["replies"]) > max_replies:
+                max_replies = int(thread["replies"])
                 cur_thread = thread
     return cur_thread
 
 def get_posts_reply_counts(thread, board):
-    thread_posts = grab_and_parse_thread(thread, board)["posts"]
-    replies = {}
-    for post in thread_posts:
-        if "com" in post.keys():
-            beg = 0
-            while beg < len(post["com"]):
-                pos = post["com"].find('#p', beg)
-                if pos > 0: 
-                    #TODO: replace this constant later
-                    raw_reply_str = post["com"][pos+2:pos+25]
-                    reply_str = ""
-                    for c in raw_reply_str:
-                        if c.isdigit():
-                            reply_str = reply_str + c
-                        else:
+    try:
+        thread_posts = grab_and_parse_thread(thread, board)["posts"]
+        replies = {}
+        for post in thread_posts:
+            if "com" in post.keys():
+                beg = 0
+                while beg < len(post["com"]):
+                    pos = post["com"].find('#p', beg)
+                    if pos > 0: 
+                        #TODO: replace this constant later
+                        raw_reply_str = post["com"][pos+2:pos+25]
+                        reply_str = ""
+                        for c in raw_reply_str:
+                            if c.isdigit():
+                                reply_str = reply_str + c
+                            else:
+                                break
+                        #interesting case here...
+                        if reply_str == "":
+                            print(raw_reply_str)
                             break
-                    if int(reply_str) in replies:
-                        replies[int(reply_str)] = replies[int(reply_str)] + 1
+                        if int(reply_str) in replies:
+                            replies[int(reply_str)] = replies[int(reply_str)] + 1
+                        else:
+                            replies[int(reply_str)] = 1
+                        beg = pos + 1
                     else:
-                        replies[int(reply_str)] = 1
-                    beg = pos + 1
-                else:
-                    beg = len(post["com"])
+                        beg = len(post["com"])
+    except ValueError:
+        print("Failed to get reply counts for thread \
+        {0:d}".format(thread["no"]))
     for post in thread_posts:
         if post["no"] in replies.keys():
             post["replies"] = replies[post["no"]]
@@ -198,6 +210,24 @@ def get_posts_reply_counts(thread, board):
             post["replies"] = 0
     return thread_posts
 
+def rank_names(threads, board):
+    names = {}
+    for thread in threads:
+        thread_posts = get_posts_reply_counts(thread, board)
+        #Limit rate of requests... this really slows us down though
+        time.sleep(1.1)
+        print("Ranking Names...Getting Thread " + str(thread["no"]))
+        for post in thread_posts:
+            cur_name = ""
+            if "name" in post:
+                cur_name = post["name"]
+            if "trip" in post:
+                cur_name = cur_name + post["trip"]
+            if cur_name in names:
+                names[cur_name] = names[cur_name] + post["replies"]
+            else:
+                names[cur_name] = post["replies"]
+    return sorted(names.items(), key = lambda name: name[1], reverse=True)
 
 def print_top_special_thread(thread_type, threads, board):
     if thread_type == 'Battlestation': 
@@ -216,13 +246,21 @@ def print_top_special_thread(thread_type, threads, board):
             return_string = return_string + '<a \
 href="http://boards.4chan.org/{0}/thread/{3}#p{4}">post</a><br \><a \
 href="http://i.4cdn.org/{0}/{1}{2}"><img src="http://i.4cdn.org/{0}/{1}s.jpg" \
-height="100"></a><br \><br \><br \
+width="320"></a><br \><br \><br \
 \>'.format(board,post["tim"],post["ext"],special_thread["no"],post["no"])
             i = i+1
         if i >= MAX_IMAGES:
             break
     print(return_string)
     return(return_string)
+
+def print_ranked_names(threads, board):
+    ranked_names = rank_names(threads, 'g')
+    rank_string = ""
+    for i in range(0, min(RANKS, len(ranked_names))):
+        rank_string = rank_string + "{0:d}. {1} ({2:d} replies)\n".format(i, ranked_names[i][0],\
+        ranked_names[i][1])
+    return rank_string
 
 def main():
     g_json = grab_and_parse(G_URL)
@@ -244,9 +282,12 @@ def main():
 
     battlestation_string = print_top_special_thread("Battlestation", unstopped_threads, 'g') 
     desktop_string = print_top_special_thread("Desktop", unstopped_threads, 'g') 
-
+    name_string = print_ranked_names(unstopped_threads, 'g')
+    
     write_kop_tek(battlestation_string, "battlestation", False)
     write_kop_tek(desktop_string, "desktop", False)
+    write_kop_tek(name_string, "name", False)
+
 
 if __name__ == '__main__':
     main()
