@@ -215,7 +215,7 @@ def rank_names(threads, board):
     names = {}
     for thread in threads:
         thread_posts = get_posts_reply_counts(thread, board)
-	if thread_posts is None:
+        if thread_posts is None:
             continue
         #Limit rate of requests... this really slows us down though
         time.sleep(1.1)
