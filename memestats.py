@@ -17,6 +17,10 @@ and 'hackintosh' not in thread['com_lower']
 def G_BATTLESTATION_FILTER(thread):
     return ('battlestation' in thread['com_lower'] and 'thread' in
 thread['com_lower']) or '/bst/' in thread['com_lower']
+
+def G_THINKPAD_FILTER(thread):
+    return ('thinkpad' in thread['com_lower'] and 'thread' in\
+    thread['com_lower']) or '/tpg/' in thread['com_lower']
     
 
 G_FILTERS = \
@@ -44,6 +48,8 @@ ADDITIONAL_STOP_WORDS = {"like", "one", "/g/", "may", "-", "thread","someone",
 "back", "best", "user", "might", "link", "use", "threads", "you're"}
 
 K = 50
+TRUNCATE_MAX_WORD_LEN = 20
+TRUNCATE_MAX_COM_LEN = 140
 MAX_BAR_LEN = 20
 MAX_IMAGES = 5
 RANKS = 15
@@ -126,6 +132,9 @@ def print_kop_tek(best_words):
     result = ""
     for i in range(0, K):
         if len(best_words[i][0]) > max_len:
+            if len(best_words[i][0]) > TRUNCATE_MAX_WORD_LEN:
+                best_words[i][0] = best_words[i][0][0:TRUNCATE_MAX_WORD_LEN] +\
+                "..."
             max_len = len(best_words[i][0])
         bars[i] = round(MAX_BAR_LEN*best_words[i][1]/rel_max)
     result = result + 'word'.ljust(max_len+1) + '│' + 'count' + "\n"
@@ -147,25 +156,20 @@ def write_kop_tek(write_string, filename, plain):
     os.rename('ihopenoonereadsthis', filename)
 
 def gen_link(thread, board):
+    if len(thread['com']) > TRUNCATE_MAX_COM_LEN:
+        comment = thread['com'][0:TRUNCATE_MAX_COM_LEN] + "..."
+    else:
+        comment = thread['com']
+        
     return "<a href={0}>thread</a> {1} <br \> <br \>".format(
         "http://boards.4chan.org/{0}/thread/{1}/".format(board, thread["no"]), 
-        html.unescape(re.sub("<.*?>", "", thread['com'])))
+        html.unescape(re.sub("<.*?>", "", comment)))
 
-def get_battlestation_thread(threads):
+def get_special_thread(filter_func, threads):
     max_replies = 0
     cur_thread = None
     for thread in threads:
-        if G_BATTLESTATION_FILTER(thread):
-            if int(thread["replies"]) > max_replies:
-                max_replies = int(thread["replies"])
-                cur_thread = thread
-    return cur_thread
-
-def get_desktop_thread(threads):
-    max_replies = 0
-    cur_thread = None
-    for thread in threads:
-        if G_DESKTOP_FILTER(thread):
+        if filter_func(thread):
             if int(thread["replies"]) > max_replies:
                 max_replies = int(thread["replies"])
                 cur_thread = thread
@@ -232,12 +236,10 @@ def rank_names(threads, board):
                 names[cur_name] = post["replies"]
     return sorted(names.items(), key = lambda name: name[1], reverse=True)
 
-def print_top_special_thread(thread_type, threads, board):
-    if thread_type == 'Battlestation': 
-        special_thread = get_battlestation_thread(threads)
-    else:
-        special_thread = get_desktop_thread(threads)
-    return_string = thread_type + " Thread Not Found"
+def print_top_special_thread(filter_func, threads, board):
+    special_thread = get_special_thread(filter_func, threads)
+            
+    return_string = "Thread Not Found"
     if special_thread is None:
         return return_string
     posts = get_posts_reply_counts(special_thread, board)
@@ -283,12 +285,15 @@ def main():
     write_kop_tek(link_string, "links", False)
     write_kop_tek(print_kop_tek(top_words), "koptek.txt", True)
 
-    battlestation_string = print_top_special_thread("Battlestation", unstopped_threads, 'g') 
-    desktop_string = print_top_special_thread("Desktop", unstopped_threads, 'g') 
+    battlestation_string = print_top_special_thread(G_BATTLESTATION_FILTER, unstopped_threads, 'g') 
+    desktop_string = print_top_special_thread(G_DESKTOP_FILTER, unstopped_threads, 'g') 
+    thinkpad_string = print_top_special_thread(G_THINKPAD_FILTER,\
+    unstopped_threads, 'g')
     name_string = print_ranked_names(unstopped_threads, 'g')
     
     write_kop_tek(battlestation_string, "battlestation", False)
     write_kop_tek(desktop_string, "desktop", False)
+    write_kop_tek(thinkpad_string, "thinkpad", False)
     write_kop_tek(name_string, "name", False)
 
 
