@@ -8,5 +8,5 @@ do
 	cp koptek.txt /var/www/html/
     cp name /var/www/html/
 	echo $(date) > /var/www/html/memetime
-	sleep 300
+	sleep 120
 done
