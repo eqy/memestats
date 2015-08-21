@@ -16,11 +16,11 @@ and 'hackintosh' not in thread['com_lower']
 
 def G_BATTLESTATION_FILTER(thread):
     return ('battlestation' in thread['com_lower'] and 'thread' in
-thread['com_lower']) or '/bst/' in thread['com_lower']
+thread['com_lower']) or 'bst' in thread['com_lower']
 
 def G_THINKPAD_FILTER(thread):
     return ('thinkpad' in thread['com_lower'] and 'thread' in\
-    thread['com_lower']) or '/tpg/' in thread['com_lower']
+    thread['com_lower']) or 'tpg' in thread['com_lower']
     
 
 G_FILTERS = \
