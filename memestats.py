@@ -123,7 +123,7 @@ def most_frequent_words(threads):
                 word_counts[word] = word_counts[word] + int(thread['replies'])
             else:
                 word_counts[word] = int(thread['replies'])
-    return sorted([item for item in word_counts.items()], key=lambda item: item[1], reverse=True)
+    return sorted([[item[0], item[1]] for item in word_counts.items()], key=lambda item: item[1], reverse=True)
 
 def print_kop_tek(best_words):
     rel_max = best_words[0][1] 
